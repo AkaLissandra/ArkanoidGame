@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build ArkanoidGame (g++)", // Tên task, bạn có thể thay đổi nếu muốn
+            "type": "shell", // Loại task là chạy lệnh shell
+            "command": "g++", // Lệnh để biên dịch (dùng g++ đã cài)
+            "args": [
+                "-g", // Thêm thông tin để debug
+                "${workspaceFolder}/src/main.cpp", // File mã nguồn đầu vào (giả sử là main.cpp trong thư mục src)
+                "-o",
+                "${workspaceFolder}/bin/ArkanoidGame.exe", // File thực thi (.exe) đầu ra, đặt trong thư mục bin
+                "-I${workspaceFolder}/include", // Đường dẫn đến thư mục chứa thư mục SDL2 header (-I là include)
+                "-L${workspaceFolder}/lib",     // Đường dẫn đến thư mục chứa các file thư viện .a / .dll.a (-L là library path)
+                // Các thư viện cần liên kết (-l là link) - Thứ tự có thể quan trọng!
+                "-lmingw32",    // Thư viện runtime MinGW
+                "-lSDL2main",   // Thư viện main của SDL
+                "-lSDL2",       // Thư viện SDL2 core
+                "-lSDL2_image", // Thư viện SDL_image
+                "-lSDL2_mixer", // Thư viện SDL_mixer
+                "-lSDL2_ttf"    // Thư viện SDL_ttf
+            ],
+            "options": {
+                // Thư mục làm việc hiện tại khi chạy lệnh build, đặt là thư mục gốc của dự án
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc" // Để VS Code hiểu lỗi output từ g++
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true // Đặt làm task build mặc định (chạy bằng Ctrl+Shift+B)
+            },
+            "detail": "Biên dịch ArkanoidGame bằng g++ sử dụng thư viện SDL2" // Mô tả thêm cho task
+        }
+    ]
+}

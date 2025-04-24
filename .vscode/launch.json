@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug ArkanoidGame (gdb)", // Tên cấu hình debug
+            "type": "cppdbg", // Kiểu debugger là C++
+            "request": "launch", // Yêu cầu là 'launch' (chạy mới) chứ không phải 'attach' (gắn vào process đang chạy)
+            "program": "${workspaceFolder}/bin/ArkanoidGame.exe", // Đường dẫn đến file .exe sẽ chạy (kết quả từ tasks.json)
+            "args": [], // Các tham số dòng lệnh nếu bạn cần truyền cho chương trình khi chạy
+            "stopAtEntry": false, // Có dừng ngay tại hàm main khi bắt đầu debug hay không
+            "cwd": "${workspaceFolder}", // Thư mục làm việc hiện tại khi chạy chương trình (quan trọng để tìm DLL trong thư mục /bin)
+            "environment": [],
+            "externalConsole": false, // false: Dùng console tích hợp của VS Code, true: Mở cửa sổ console riêng (cmd)
+            "MIMode": "gdb", // Chế độ MI (Machine Interface) là dùng gdb
+            // !!! QUAN TRỌNG: SỬA ĐƯỜNG DẪN NÀY CHO ĐÚNG !!!
+            "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe", 
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            // Tên task build trong tasks.json sẽ được chạy trước khi khởi động debug
+            "preLaunchTask": "Build ArkanoidGame (g++)" 
+        }
+    ]
+}
