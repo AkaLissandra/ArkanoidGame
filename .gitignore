@@ -1,0 +1,22 @@
+# Output của quá trình build
+bin/
+*.exe
+*.o
+*.obj
+*.dll # Không nên đưa DLL lên repo, người khác cần tự build hoặc lấy từ nguồn chính thức
+
+# Thư viện và header tải về (dung lượng lớn và người khác nên tự thiết lập)
+lib/
+include/
+
+# File tạm hoặc đặc thù của HĐH/IDE
+*.stackdump
+Thumbs.db
+desktop.ini
+
+# Cấu hình VS Code (chỉ giữ lại những file cấu hình chung của dự án)
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+# !.vscode/settings.json  # Bỏ dấu # nếu muốn chia sẻ cả settings.json
+# !.vscode/extensions.json # Bỏ dấu # nếu muốn gợi ý extension cho người khác

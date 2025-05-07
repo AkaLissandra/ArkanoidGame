@@ -8,6 +8,11 @@
             "args": [
                 "-g", // Thêm thông tin để debug
                 "${workspaceFolder}/src/main.cpp", // File mã nguồn đầu vào (giả sử là main.cpp trong thư mục src)
+                "${workspaceFolder}/src/Game.cpp",
+                "${workspaceFolder}/src/TextureManager.cpp",
+                "${workspaceFolder}/src/Paddle.cpp",
+                "${workspaceFolder}/src/Ball.cpp",
+                "${workspaceFolder}/src/Brick.cpp",
                 "-o",
                 "${workspaceFolder}/bin/ArkanoidGame.exe", // File thực thi (.exe) đầu ra, đặt trong thư mục bin
                 "-I${workspaceFolder}/include", // Đường dẫn đến thư mục chứa thư mục SDL2 header (-I là include)
