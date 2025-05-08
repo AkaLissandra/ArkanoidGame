@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "Constants.h"
+#include <SDL2/SDL_mixer.h>
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -15,6 +16,14 @@ Game::Game() : isRunning(false), window(nullptr), renderer(nullptr), m_currentGa
     m_isMouseOverResume_PAUSE = false;
     m_isMouseOverMenu_PAUSE = false;
     m_isMouseOverReplay_PAUSE = false;
+
+    m_musicPlay = nullptr;
+    m_sfxBallHit = nullptr;
+    m_sfxLoseLife = nullptr;
+    m_sfxButtonClick = nullptr;
+    m_sfxReward = nullptr;
+
+    m_isSoundMuted = false;
 }
 
 Game::~Game() {
@@ -35,15 +44,60 @@ bool Game::init(const char* title, int xpos, int ypos, int width, int height, bo
 
     if (TTF_Init() == -1) {
         std::cerr << "SDL_ttf could not initialize! TTF_Error: " << TTF_GetError() << std::endl;
-        SDL_Quit();
+        clean();
         return false;
     }
     std::cout << "SDL_ttf initialized." << std::endl;
 
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std::cerr << "SDL_mixer could not initialize! Mix_Error: " << Mix_GetError() << std::endl;
+        clean();
+        return false;
+    }
+    std::cout << "SDL_mixer initialized (Mix_OpenAudio)." << std::endl;
+
+    int mixFlags = MIX_INIT_MP3 | MIX_INIT_OGG;
+    if ((Mix_Init(mixFlags) & mixFlags) != mixFlags) {
+        std::cerr << "SDL_mixer could not initialize for MP3 and OGG support! Mix_Error: " << Mix_GetError() << std::endl;
+        clean();
+        return false; 
+    }
+    std::cout << "SDL_mixer MP3 & OGG support initialized." << std::endl;
+
+    std::cout << "Attempting to load background music..." << std::endl;
+    m_musicPlay = Mix_LoadMUS("assets/sounds/music_play.mp3");
+    if (m_musicPlay == nullptr) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    } else {
+        std::cout << "Music 'music_play.mp3' loaded successfully." << std::endl;
+    }
+
+    // Load SFX (giả sử tên file là sfx_ball_hit.wav, sfx_lose_life.wav, sfx_button_click.wav)
+    m_sfxBallHit = Mix_LoadWAV("assets/sounds/sfx_ball_hit.wav");
+    if (m_sfxBallHit == nullptr) {
+        std::cerr << "Failed to load sfx_ball_hit.wav! Mix_Error: " << Mix_GetError() << std::endl; /*Xử lý lỗi*/
+    }
+
+    m_sfxLoseLife = Mix_LoadWAV("assets/sounds/sfx_lose_life.wav");
+    if (m_sfxLoseLife == nullptr) {
+        std::cerr << "Failed to load sfx_lose_life.wav! Mix_Error: " << Mix_GetError() << std::endl; /*Xử lý lỗi*/
+    }
+
+    m_sfxButtonClick = Mix_LoadWAV("assets/sounds/sfx_button_click.wav");
+    if (m_sfxButtonClick == nullptr) {
+        std::cerr << "Failed to load sfx_button_click.wav! Mix_Error: " << Mix_GetError() << std::endl; /*Xử lý lỗi*/
+    }
+
+    m_sfxReward = Mix_LoadWAV("assets/sounds/sfx_reward.wav"); // Đảm bảo đúng tên file
+    if (m_sfxReward == nullptr) {
+        std::cerr << "Failed to load sfx_reward.wav! Mix_Error: " << Mix_GetError() << std::endl;
+        // Có thể chỉ báo lỗi vì đây là SFX phụ, không cần return false
+    }
+
     window = SDL_CreateWindow(title, xpos, ypos, width, height, flags | SDL_WINDOW_SHOWN);
     if (window == nullptr) {
         std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
-        SDL_Quit(); 
+        clean();
         return false;
     }
     std::cout << "2. Window created." << std::endl;
@@ -51,8 +105,7 @@ bool Game::init(const char* title, int xpos, int ypos, int width, int height, bo
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == nullptr) {
         std::cerr << "Renderer could not be created! SDL Error: " << SDL_GetError() << std::endl;
-        SDL_DestroyWindow(window); 
-        SDL_Quit();
+        clean();
         return false;
     }
     std::cout << "3. Renderer created." << std::endl;
@@ -110,7 +163,7 @@ bool Game::init(const char* title, int xpos, int ypos, int width, int height, bo
     float ballInitialVelX = 5.0f;
     float ballInitialVelY = -5.0f;
 
-    m_ball.init("ball", ballInitialX, ballInitialY, BALL_WIDTH, BALL_HEIGHT, ballInitialVelX, ballInitialVelY);
+    m_ball.init("ball", ballInitialX, ballInitialY, BALL_WIDTH, BALL_HEIGHT, ballInitialVelX, ballInitialVelY, m_sfxBallHit);
     std::cout << "Ball initialized." << std::endl;
 
     if (!textureManager.load(renderer, "assets/images/brick_blue.png", "brick_blue")) return false; 
@@ -139,10 +192,39 @@ bool Game::init(const char* title, int xpos, int ypos, int width, int height, bo
     m_pauseIconDisplayRect.w = PAUSE_ICON_WIDTH;
     m_pauseIconDisplayRect.h = PAUSE_ICON_HEIGHT;
 
+    if (!textureManager.load(renderer, "assets/images/icon_sound_on.png", "icon_sound_on")) { // Giả sử tên file là icon_sound_on.png
+        std::cerr << "Failed to load icon_sound_on.png!" << std::endl; return false; 
+    }
+    if (!textureManager.load(renderer, "assets/images/icon_sound_off.png", "icon_sound_off")) { // Giả sử tên file là icon_sound_off.png
+        std::cerr << "Failed to load icon_sound_off.png!" << std::endl; return false; 
+    }
+    std::cout << "Sound icons loaded." << std::endl;
+
+    m_soundIconRect.y = UI_TOP_MARGIN;
+    m_soundIconRect.w = SOUND_ICON_WIDTH;
+    m_soundIconRect.h = SOUND_ICON_HEIGHT;
+
+    if (!textureManager.load(renderer, "assets/images/powerup_extralife.png", "powerup_life")) {
+        std::cerr << "Failed to load powerup_extralife.png!" << std::endl;
+        // Thêm dọn dẹp đầy đủ rồi return false (ví dụ: đóng font, clear texture, quit các module)
+        return false;
+    }
+    std::cout << "Extra Life PowerUp texture loaded." << std::endl;
+
+    if (!textureManager.load(renderer, "assets/images/powerup_bonus.png", "powerup_bonus")) {
+        std::cerr << "Failed to load powerup_bonus.png!" << std::endl;
+        return false; // Thêm dọn dẹp đầy đủ
+    }
+    std::cout << "Bonus Points PowerUp texture loaded." << std::endl;
+
+    if (!textureManager.load(renderer, "assets/images/bg.png", "background_shared")) {
+        std::cerr << "Failed to load bg.png as shared background!" << std::endl;
+        return false; 
+    }
+    std::cout << "Shared background texture ('background_shared') loaded." << std::endl;
     
     createBrickLayout();
     
-
     m_fontScore = TTF_OpenFont("assets/fonts/jersey.ttf", FONT_SIZE_SCORE);
     if (m_fontScore == nullptr) {
         std::cerr << "Failed to load font for Score! TTF_Error: " << TTF_GetError() << std::endl;
@@ -206,7 +288,7 @@ bool Game::init(const char* title, int xpos, int ypos, int width, int height, bo
 
     std::cout << "Menu items positions calculated for vertical centering." << std::endl;
 
-    m_score = 0; // Khởi tạo điểm
+    m_score = 0;
     std::cout << "Score initialized to: " << m_score << std::endl;
 
     loadHighScore();
@@ -219,9 +301,20 @@ bool Game::init(const char* title, int xpos, int ypos, int width, int height, bo
     m_currentGameState = GameStateEnum::MENU;
     std::cout << "Current game state set to MENU." << std::endl;
 
+    if (m_musicPlay != nullptr) {
+        if (Mix_PlayingMusic() == 0) {
+            if (Mix_PlayMusic(m_musicPlay, -1) == -1) {
+                std::cerr << "Mix_PlayMusic failed to play music from init: " << Mix_GetError() << std::endl;
+            } else {
+                std::cout << "Background music started playing (from init for MENU)." << std::endl;
+            }
+        }
+    }
+
     isRunning = true; 
     std::cout << "Game initialized successfully!" << std::endl;
     return true;
+    
 }
 
 void Game::renderText(TTF_Font* fontToUse, const std::string& message, int x, int y, SDL_Color color) {
@@ -291,26 +384,50 @@ void Game::handleEvents() {
                 if (event.type == SDL_MOUSEMOTION) {
                     int mouseX = event.motion.x;
                     int mouseY = event.motion.y;
+                    SDL_Point mousePoint_motion = {mouseX, mouseY}; // Đặt tên khác để tránh nhầm lẫn nếu muốn
 
-                    SDL_Point mousePoint = {mouseX, mouseY};
-                    m_isMouseOverStart = SDL_PointInRect(&mousePoint, &m_startButtonRect);
-                    m_isMouseOverQuit = SDL_PointInRect(&mousePoint, &m_quitButtonRect);
+                    m_isMouseOverStart = SDL_PointInRect(&mousePoint_motion, &m_startButtonRect);
+                    m_isMouseOverQuit = SDL_PointInRect(&mousePoint_motion, &m_quitButtonRect);
+                    // Nếu bạn muốn nút sound cũng có hiệu ứng hover, thêm dòng tương tự:
+                    // m_isMouseOverSound_MENU = SDL_PointInRect(&mousePoint_motion, &m_soundIconRect); 
+                    // (cần khai báo m_isMouseOverSound_MENU trong Game.h và Game())
 
                 } else if (event.type == SDL_MOUSEBUTTONDOWN) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
-                        if (m_isMouseOverStart) {
+                        // Lấy tọa độ chuột của sự kiện CLICK
+                        int mouseX_click = event.button.x;
+                        int mouseY_click = event.button.y;
+                        SDL_Point mousePoint_click = {mouseX_click, mouseY_click}; // Tạo mousePoint cho sự kiện click
+
+                        if (m_isMouseOverStart) { // Kiểm tra cờ hover (đã được set bởi MOUSEMOTION)
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             std::cout << "Start button clicked!" << std::endl;
                             resetGameForPlay();
-                        } else if (m_isMouseOverQuit) {
+                        } else if (m_isMouseOverQuit) { // Kiểm tra cờ hover
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             std::cout << "Quit button clicked!" << std::endl;
                             isRunning = false;
+                        }
+                        // Kiểm tra click trực tiếp vào sound icon bằng tọa độ của sự kiện click
+                        else if (SDL_PointInRect(&mousePoint_click, &m_soundIconRect)) { 
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
+                            m_isSoundMuted = !m_isSoundMuted;
+                            if (m_isSoundMuted) {
+                                Mix_VolumeMusic(0); Mix_Volume(-1, 0);
+                                std::cout << "Sound MUTED (from MENU)" << std::endl;
+                            } else {
+                                Mix_VolumeMusic(MIX_MAX_VOLUME / 2); Mix_Volume(-1, MIX_MAX_VOLUME);
+                                std::cout << "Sound UNMUTED (from MENU)" << std::endl;
+                            }
                         }
                     }
                 } else if (event.type == SDL_KEYDOWN) {
                     if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_SPACE) {
-                         std::cout << "Enter/Space pressed on Menu - Starting game!" << std::endl;
-                         resetGameForPlay();
+                        if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0); // Thêm âm thanh cho cả phím
+                        std::cout << "Enter/Space pressed on Menu - Starting game!" << std::endl;
+                        resetGameForPlay();
                     } else if (event.key.keysym.sym == SDLK_ESCAPE) {
+                        if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0); // Có thể dùng âm thanh khác
                         std::cout << "Escape pressed on Menu - Quitting game!" << std::endl;
                         isRunning = false;
                     }
@@ -318,26 +435,48 @@ void Game::handleEvents() {
             }
                 break;
             case GameStateEnum::PLAY:
-                m_paddle.handleEvents(event);
-                if (event.type == SDL_KEYDOWN) {
-                    if (event.key.keysym.sym == SDLK_ESCAPE) {
-                        m_currentGameState = GameStateEnum::PAUSE;
-                        std::cout << "Game Paused (ESC pressed). Current state: PAUSE" << std::endl;
-                        m_isMouseOverResume_PAUSE = false;
-                        m_isMouseOverMenu_PAUSE = false;
-                        m_isMouseOverReplay_PAUSE = false;
-                    }
-                } else if (event.type == SDL_MOUSEBUTTONDOWN) {
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                        int mouseX = event.button.x;
-                        int mouseY = event.button.y;
-                        SDL_Point mousePoint = {mouseX, mouseY};
-                        if (SDL_PointInRect(&mousePoint, &m_pauseIconDisplayRect)) {
+                { // Thêm dấu { để bao bọc code cho rõ ràng (nếu bạn chưa có)
+                    m_paddle.handleEvents(event); // Xử lý di chuyển paddle
+
+                    if (event.type == SDL_KEYDOWN) {
+                        if (event.key.keysym.sym == SDLK_ESCAPE) { // Nhấn ESC để vào PAUSE
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             m_currentGameState = GameStateEnum::PAUSE;
-                            std::cout << "Pause icon clicked. Game Paused. Current state: PAUSE" << std::endl;
+                            std::cout << "Game Paused (ESC pressed). Current state: PAUSE" << std::endl;
+                            // Reset cờ hover của các nút trong PAUSE state
                             m_isMouseOverResume_PAUSE = false;
                             m_isMouseOverMenu_PAUSE = false;
                             m_isMouseOverReplay_PAUSE = false;
+                        }
+                    } else if (event.type == SDL_MOUSEBUTTONDOWN) {
+                        if (event.button.button == SDL_BUTTON_LEFT) {
+                            int mouseX = event.button.x; // Lấy tọa độ chuột khi click
+                            int mouseY = event.button.y;
+                            SDL_Point mousePoint_click = {mouseX, mouseY}; // Tạo điểm chuột cho sự kiện click
+    
+                            if (SDL_PointInRect(&mousePoint_click, &m_pauseIconDisplayRect)) { // Click vào icon Pause
+                                if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
+                                m_currentGameState = GameStateEnum::PAUSE;
+                                std::cout << "Pause icon clicked. Game Paused. Current state: PAUSE" << std::endl;
+                                m_isMouseOverResume_PAUSE = false;
+                                m_isMouseOverMenu_PAUSE = false;
+                                m_isMouseOverReplay_PAUSE = false;
+                            } 
+                            // ---> THÊM XỬ LÝ CLICK NÚT ÂM THANH CHO PLAY STATE <---
+                            else if (SDL_PointInRect(&mousePoint_click, &m_soundIconRect)) { // Kiểm tra click vào sound icon
+                                if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0); // Phát âm thanh click
+                                m_isSoundMuted = !m_isSoundMuted; // Đảo trạng thái mute
+                                if (m_isSoundMuted) {
+                                    Mix_VolumeMusic(0);          // Tắt nhạc nền (volume 0)
+                                    Mix_Volume(-1, 0);           // Tắt tất cả các kênh SFX (volume 0 cho channel -1)
+                                    std::cout << "Sound MUTED (from PLAY state)" << std::endl;
+                                } else {
+                                    Mix_VolumeMusic(MIX_MAX_VOLUME / 2); // Mở lại nhạc nền (ví dụ: 50% volume, hoặc MIX_MAX_VOLUME)
+                                    Mix_Volume(-1, MIX_MAX_VOLUME);    // Mở lại tất cả các kênh SFX
+                                    std::cout << "Sound UNMUTED (from PLAY state)" << std::endl;
+                                }
+                            }
+                            // ---> KẾT THÚC XỬ LÝ CLICK NÚT ÂM THANH CHO PLAY STATE <---
                         }
                     }
                 }
@@ -346,6 +485,7 @@ void Game::handleEvents() {
             {
                 if (event.type == SDL_KEYDOWN) {
                     if (event.key.keysym.sym == SDLK_ESCAPE) {
+                        if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                         m_currentGameState = GameStateEnum::PLAY;
                         std::cout << "Game Resumed (ESC pressed). Current state: PLAY" << std::endl;
                     }
@@ -359,14 +499,17 @@ void Game::handleEvents() {
                 } else if (event.type == SDL_MOUSEBUTTONDOWN) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         if (m_isMouseOverResume_PAUSE) {
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             m_currentGameState = GameStateEnum::PLAY;
                             std::cout << "Resume button clicked. Current state: PLAY" << std::endl;
                         } else if (m_isMouseOverMenu_PAUSE) {
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             m_currentGameState = GameStateEnum::MENU;
                             m_isMouseOverStart = false; 
                             m_isMouseOverQuit = false;
                             std::cout << "Return to Menu button clicked (Pause). Current state: MENU" << std::endl;
                         } else if (m_isMouseOverReplay_PAUSE) {
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             std::cout << "Replay button clicked (Pause)!" << std::endl;
                             resetGameForPlay();
                         }
@@ -387,9 +530,11 @@ void Game::handleEvents() {
                 } else if (event.type == SDL_MOUSEBUTTONDOWN) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         if (m_isMouseOverReplay_GO) {
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             std::cout << "Replay button clicked (Game Over)!" << std::endl;
                             resetGameForPlay();
                         } else if (m_isMouseOverMenu_GO) {
+                            if (m_sfxButtonClick != nullptr) Mix_PlayChannel(-1, m_sfxButtonClick, 0);
                             std::cout << "Return to Menu button clicked (Game Over)!" << std::endl;
                             m_currentGameState = GameStateEnum::MENU;
                             m_isMouseOverStart = false; 
@@ -424,30 +569,24 @@ void Game::update() {
             SDL_Rect paddleRect = m_paddle.getRect();
 
             if (SDL_HasIntersection(&ballRect, &paddleRect)) {
-                // Chỉ xử lý va chạm nếu bóng đang đi xuống và ở đúng độ cao của paddle
-                if (m_ball.getVelY() > 0 && ballRect.y + ballRect.h >= paddleRect.y && ballRect.y < paddleRect.y + paddleRect.h / 2) { // Thêm điều kiện check y của bóng so với paddle
+                if (m_ball.getVelY() > 0 && ballRect.y + ballRect.h >= paddleRect.y && ballRect.y < paddleRect.y + paddleRect.h / 2) {
                     std::cout << "Collision Paddle-Ball Detected! (Random X bounce)" << std::endl;
                     
-                    // 1. Đảo chiều vận tốc Y (luôn hướng lên)
-                    m_ball.setVelY(-std::abs(m_ball.getVelY())); // Dùng std::abs cho float
+                    m_ball.setVelY(-std::abs(m_ball.getVelY()));
 
-                    // 2. Đặt lại vị trí Y của bóng ngay trên paddle để tránh bị dính
                     m_ball.setY(static_cast<float>(paddleRect.y - ballRect.h)); 
                     
-                    // 3. TẠO VẬN TỐC X NGẪU NHIÊN MỚI
-                    float minAbsSpeedX = 4.0f; // Tốc độ ngang tối thiểu (để không quá thẳng đứng)
-                    float maxAbsSpeedX = 6.5f; // Tốc độ ngang tối đa (bạn có thể điều chỉnh các giá trị này)
+                    float minAbsSpeedX = 4.0f;
+                    float maxAbsSpeedX = 6.5f;
                     
-                    // Tạo giá trị tuyệt đối ngẫu nhiên cho velX trong khoảng [minAbsSpeedX, maxAbsSpeedX]
                     float randomMagnitude = minAbsSpeedX + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (maxAbsSpeedX - minAbsSpeedX)));
-                    
-                    // Random hướng (50% trái, 50% phải)
                     if (rand() % 2 == 0) {
                         m_ball.setVelX(randomMagnitude);
                     } else {
                         m_ball.setVelX(-randomMagnitude);
                     }
                     std::cout << "Paddle hit - New random velX: " << m_ball.getVelX() << std::endl;
+                    if (m_sfxBallHit != nullptr) Mix_PlayChannel(-1, m_sfxBallHit, 0);
                 }
             }
 
@@ -463,16 +602,84 @@ void Game::update() {
 
                         m_score += 10;
                         std::cout << "Brick hit! Score: " << m_score << std::endl;
+                        if (m_sfxBallHit != nullptr) Mix_PlayChannel(-1, m_sfxBallHit, 0);
 
-                        break;
+                        if (rand() % POWERUP_SPAWN_CHANCE_NORMAL == 0) { // Ví dụ: 1/10 cơ hội
+                            std::cout << "DEBUG: Spawning EXTRA_LIFE PowerUp!" << std::endl;
+                            PowerUpItem newItem;
+                            newItem.rect.w = POWERUP_SIZE;
+                            newItem.rect.h = POWERUP_SIZE;
+                            newItem.rect.x = brickRect.x + (brickRect.w / 2) - (POWERUP_SIZE / 2); // Rơi từ giữa gạch
+                            newItem.rect.y = brickRect.y;
+                            newItem.y_floatPos = static_cast<float>(newItem.rect.y);
+                            newItem.isActive = true;
+                            if (rand() % 2 == 0) { 
+                                newItem.type = PowerUpType::EXTRA_LIFE;
+                                newItem.textureID = "powerup_life";
+                                std::cout << "DEBUG: Spawning EXTRA_LIFE PowerUp!" << std::endl;
+                            } else {
+                                newItem.type = PowerUpType::BONUS_POINTS;
+                                newItem.textureID = "powerup_bonus";
+                                std::cout << "DEBUG: Spawning BONUS_POINTS PowerUp!" << std::endl;
+                            }
+                            m_powerUps.push_back(newItem); // Thêm vào vector
+                        }   
+                    }
+                }
+            }
+
+            for (size_t i = 0; i < m_powerUps.size(); ++i) {
+                if (m_powerUps[i].isActive) {
+                    // Cho power-up rơi xuống
+                    m_powerUps[i].y_floatPos += POWERUP_FALL_SPEED;
+                    m_powerUps[i].rect.y = static_cast<int>(m_powerUps[i].y_floatPos);
+
+                    // Nếu rơi ra khỏi màn hình thì hủy
+                    if (m_powerUps[i].rect.y > SCREEN_HEIGHT) {
+                        m_powerUps[i].isActive = false;
+                    } 
+                    // Nếu không bị hủy bởi rơi ra ngoài, thì kiểm tra va chạm paddle
+                    else if (SDL_HasIntersection(&paddleRect, &m_powerUps[i].rect)) {
+                        bool collected = false;
+                        // Chỉ xử lý cho loại EXTRA_LIFE
+                        switch (m_powerUps[i].type) {
+                            case PowerUpType::EXTRA_LIFE:
+                                if (m_lives < MAX_LIVES) { 
+                                    m_lives++;
+                                    std::cout << "DEBUG: Extra Life collected! Lives: " << m_lives << std::endl;
+                                    collected = true;
+                                    // Phát âm thanh nếu có
+                                } else {
+                                    std::cout << "DEBUG: Extra Life collected, but lives already max." << std::endl;
+                                    m_score += 25; // Ví dụ: thưởng điểm
+                                    collected = true;
+                                }
+                                break; // Kết thúc xử lý EXTRA_LIFE
+
+                            case PowerUpType::BONUS_POINTS: // <--- THÊM CASE NÀY
+                                m_score += BONUS_POINTS_VALUE; // Cộng điểm thưởng
+                                std::cout << "DEBUG: Bonus Points collected! Score: " << m_score << std::endl;
+                                collected = true;
+                                // Phát âm thanh nếu có
+                                break; // Kết thúc xử lý BONUS_POINTS     
+                            default:
+                                break;
+                        }
+                        if (collected) {
+                            // ---> PHÁT ÂM THANH NHẶT POWER-UP <---
+                           if (m_sfxReward != nullptr) Mix_PlayChannel(-1, m_sfxReward, 0);
+                           // Hoặc nếu bạn có file sfx_powerup_pickup riêng thì dùng nó
+                        }
+                        m_powerUps[i].isActive = false; // Đánh dấu là đã nhặt
                     }
                 }
             }
 
             if (areAllBricksCleared()) {
                 std::cout << "LEVEL CLEARED! Resetting bricks." << std::endl;
-                
+                m_score += 100;
                 std::cout << "Score after level bonus: " << m_score << std::endl;
+                if (m_sfxReward != nullptr) Mix_PlayChannel(-1, m_sfxReward, 0);
 
                 int ballInitialX = m_paddle.getRect().x + (m_paddle.getRect().w / 2) - (BALL_WIDTH / 2);
                 int ballInitialY = m_paddle.getRect().y - BALL_HEIGHT - 10;
@@ -486,6 +693,7 @@ void Game::update() {
                 createBrickLayout();
             }
             if (m_ball.isOutOfBounds()) {
+                if (m_sfxLoseLife != nullptr) Mix_PlayChannel(-1, m_sfxLoseLife, 0);
                 m_lives--;
                 std::cout << "==> Ball is Out! Lives NOW: " << m_lives << std::endl;
 
@@ -496,10 +704,10 @@ void Game::update() {
                     int ballInitialY = SCREEN_HEIGHT / 2 - BALL_HEIGHT / 2;  
                     
                     float ballVelX = (rand() % 2 == 0) ? 3.0f : -3.0f;
-                    float ballVelY = -3.0f; // Luôn hướng lên
+                    float ballVelY = -3.0f;
                     m_ball.reset(ballInitialX, ballInitialY, ballVelX, ballVelY);
                     std::cout << "    DEBUG: Ball reset completed." << std::endl;
-                } else { // m_lives <= 0 (Hết mạng)
+                } else {
                     std::cout << "    DEBUG: Lives <= 0. Processing Game Over..." << std::endl;
                     std::cout << "    DEBUG: Current m_score = " << m_score 
                               << ", Current m_highScore = " << m_highScore << std::endl;
@@ -514,6 +722,7 @@ void Game::update() {
                     
                     std::cout << "    DEBUG: Changing current game state to GAMEOVER..." << std::endl;
                     m_currentGameState = GameStateEnum::GAMEOVER;
+                    Mix_HaltMusic();
                     std::cout << "    DEBUG: Current game state is now GAMEOVER." << std::endl;
                 }  
             }
@@ -528,6 +737,7 @@ void Game::update() {
 
         default:
             break;
+        
     }
 }
 
@@ -539,6 +749,7 @@ void Game::render() {
     switch (m_currentGameState) {
         case GameStateEnum::MENU:
         {
+            textureManager.draw(renderer, "background_shared", 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
             textureManager.draw(renderer, "logo_game", m_logoDisplayRect.x, m_logoDisplayRect.y, m_logoDisplayRect.w, m_logoDisplayRect.h);
 
             SDL_Color startColor = m_isMouseOverStart ? m_buttonHoverColor : m_buttonNormalColor;
@@ -553,10 +764,16 @@ void Game::render() {
             if (m_fontUIText != nullptr && TTF_SizeText(m_fontUIText, highScoreText_Menu.c_str(), &textW_hs, &textH_hs) == 0) {
                 renderText(m_fontUIText, highScoreText_Menu, UI_SIDE_MARGIN, SCREEN_HEIGHT - textH_hs - UI_BOTTOM_MARGIN, goldColor);
             }
+            m_soundIconRect.x = UI_SIDE_MARGIN; 
+            std::string soundIconToDraw = m_isSoundMuted ? "icon_sound_off" : "icon_sound_on";
+            textureManager.draw(renderer, soundIconToDraw, 
+                m_soundIconRect.x, m_soundIconRect.y, 
+                m_soundIconRect.w, m_soundIconRect.h);
         }
             break;
         case GameStateEnum::PLAY:
         {
+            textureManager.draw(renderer, "background_shared", 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
             m_paddle.render(renderer, textureManager);
             m_ball.render(renderer, textureManager);
             for (Brick& brick : m_bricks) {
@@ -582,6 +799,17 @@ void Game::render() {
                 m_pauseIconDisplayRect.x, m_pauseIconDisplayRect.y, 
                 m_pauseIconDisplayRect.w, m_pauseIconDisplayRect.h);
 
+            m_soundIconRect.x = m_pauseIconDisplayRect.x + m_pauseIconDisplayRect.w + ICON_SPACING; // Đặt cạnh icon Pause
+            std::string soundIconToDraw_Play = m_isSoundMuted ? "icon_sound_off" : "icon_sound_on";
+            textureManager.draw(renderer, soundIconToDraw_Play, 
+                m_soundIconRect.x, m_soundIconRect.y, 
+                m_soundIconRect.w, m_soundIconRect.h);
+            
+            for (const PowerUpItem& pu : m_powerUps) {
+                if (pu.isActive) {
+                    textureManager.draw(renderer, pu.textureID, pu.rect.x, pu.rect.y, pu.rect.w, pu.rect.h);
+                }
+            }
         }
             break;
         case GameStateEnum::PAUSE:
@@ -615,7 +843,7 @@ void Game::render() {
             int currentTextY = SCREEN_HEIGHT / 3;
 
             std::string pausedMsg = "PAUSED";
-            if (m_fontScore != nullptr && TTF_SizeText(m_fontScore, pausedMsg.c_str(), &textW, &textH) == 0) { // Dùng font to
+            if (m_fontScore != nullptr && TTF_SizeText(m_fontScore, pausedMsg.c_str(), &textW, &textH) == 0) {
                 int msgX = (SCREEN_WIDTH - textW) / 2;
                 renderText(m_fontScore, pausedMsg, msgX, currentTextY, titlePausedColor);
                 currentTextY += textH + 40; 
@@ -639,8 +867,8 @@ void Game::render() {
             
             std::string menuText_Pause = "MENU";
              if (m_fontMenuItem != nullptr && TTF_SizeText(m_fontMenuItem, menuText_Pause.c_str(), &textW, &textH) == 0) {
-                m_homeButtonRect_PAUSE = {(SCREEN_WIDTH - textW) / 2, currentTextY, textW, textH}; // Sửa tên biến Rect
-                SDL_Color menuBtnColor = m_isMouseOverMenu_PAUSE ? optionColorHover : optionColorNormal; // Sửa tên biến cờ hover
+                m_homeButtonRect_PAUSE = {(SCREEN_WIDTH - textW) / 2, currentTextY, textW, textH};
+                SDL_Color menuBtnColor = m_isMouseOverMenu_PAUSE ? optionColorHover : optionColorNormal;
                 renderText(m_fontMenuItem, menuText_Pause, m_homeButtonRect_PAUSE.x, m_homeButtonRect_PAUSE.y, menuBtnColor);
             }
         }
@@ -712,6 +940,8 @@ void Game::render() {
 
 void Game::resetGameForPlay() {
     std::cout << "Resetting game for PLAY state..." << std::endl;
+
+    m_powerUps.clear();
     
     m_lives = 3;
     std::cout << "Player lives reset to: " << m_lives << std::endl;
@@ -724,13 +954,24 @@ void Game::resetGameForPlay() {
     
     float ballInitialVelX = (rand() % 2 == 0) ? 3.0f : -3.0f;
     float ballInitialVelY = -3.0f;
-    m_ball.init("ball", ballInitialX, ballInitialY, BALL_WIDTH, BALL_HEIGHT, ballInitialVelX, ballInitialVelY);
+    m_ball.init("ball", ballInitialX, ballInitialY, BALL_WIDTH, BALL_HEIGHT, ballInitialVelX, ballInitialVelY, m_sfxBallHit);
     std::cout << "Ball reset for new game." << std::endl;
 
     createBrickLayout(); 
 
     m_currentGameState = GameStateEnum::PLAY;
     std::cout << "Switched to PLAY state." << std::endl;
+
+    if (m_musicPlay != nullptr) {
+        if (Mix_PlayingMusic() == 0) { // Nếu nhạc chưa phát (ví dụ sau khi bị Halt ở Game Over)
+            Mix_PlayMusic(m_musicPlay, -1);
+            std::cout << "Background music (re)started for PLAY state." << std::endl;
+        } else if (Mix_PausedMusic()) { // Nếu nhạc đang bị Pause (trường hợp này ít xảy ra nếu Pause không dừng nhạc)
+            Mix_ResumeMusic();
+            std::cout << "Background music resumed for PLAY state." << std::endl;
+        }
+        // Nếu nhạc đang phát rồi (từ Menu chuyển qua), nó sẽ tự động tiếp tục, không cần làm gì.
+    }
 }
 
 bool Game::areAllBricksCleared() const {
@@ -768,12 +1009,50 @@ void Game::saveHighScore() {
     }
 }
 
+// Trong file Game.cpp
 void Game::clean() {
     std::cout << "Cleaning up game..." << std::endl;
 
+    // Thứ tự dọn dẹp: Tài nguyên game -> Âm thanh -> Font -> Renderer/Window -> Subsystems
+
+    // 1. Dọn dẹp Texture Manager (giả sử nó tự xử lý bên trong)
     textureManager.clearAllTextures();
     std::cout << "Texture Manager cleaned." << std::endl;
 
+    // 2. Dọn dẹp các đối tượng game khác (nếu cần)
+    m_bricks.clear();       // Xóa vector gạch
+    m_powerUps.clear();     // Xóa vector power-up
+    std::cout << "Game object vectors cleared." << std::endl;
+
+    // 3. Dọn dẹp Âm thanh & Nhạc (KIỂM TRA NULLPTR TRƯỚC KHI FREE)
+    std::cout << "Cleaning up sounds and music..." << std::endl;
+    if (Mix_PlayingMusic()) { // Dừng nhạc trước khi giải phóng
+       Mix_HaltMusic();
+    }
+    if(m_musicPlay != nullptr) {
+        Mix_FreeMusic(m_musicPlay);
+        m_musicPlay = nullptr;
+    }
+    if(m_sfxBallHit != nullptr) {
+        Mix_FreeChunk(m_sfxBallHit);
+        m_sfxBallHit = nullptr;
+    }
+    if(m_sfxLoseLife != nullptr) {
+        Mix_FreeChunk(m_sfxLoseLife);
+        m_sfxLoseLife = nullptr;
+    }
+    if(m_sfxButtonClick != nullptr) {
+        Mix_FreeChunk(m_sfxButtonClick);
+        m_sfxButtonClick = nullptr;
+    }
+     if(m_sfxReward != nullptr) { // Đã thêm ở bước trước
+        Mix_FreeChunk(m_sfxReward);
+        m_sfxReward = nullptr;
+    }
+    // ... (thêm if cho các sfx khác nếu có) ...
+    std::cout << "Sounds and music freed." << std::endl;
+
+    // 4. Dọn dẹp Fonts (KIỂM TRA NULLPTR TRƯỚC KHI CLOSE)
     if (m_fontScore != nullptr) {
         TTF_CloseFont(m_fontScore);
         m_fontScore = nullptr;
@@ -787,14 +1066,31 @@ void Game::clean() {
         m_fontUIText = nullptr;
     }
     std::cout << "All fonts closed." << std::endl;
-    
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    renderer = nullptr;
-    window = nullptr;
 
-    TTF_Quit();
+    // 5. Dọn dẹp Renderer và Window (KIỂM TRA NULLPTR TRƯỚC KHI DESTROY)
+    if (renderer != nullptr) {
+        SDL_DestroyRenderer(renderer);
+        renderer = nullptr;
+        std::cout << "Renderer destroyed." << std::endl;
+    }
+    if (window != nullptr) {
+        SDL_DestroyWindow(window);
+        window = nullptr;
+        std::cout << "Window destroyed." << std::endl;
+    }
+
+    // 6. Dọn dẹp các Subsystem của SDL (thứ tự ngược với init, gọi Quit thường an toàn)
+    Mix_CloseAudio(); // Đóng thiết bị âm thanh (an toàn nếu chưa mở)
+    Mix_Quit();       // Thoát khỏi các flag đã init (ví dụ: MP3, OGG)
+    std::cout << "SDL_mixer cleaned." << std::endl;
+
+    TTF_Quit();       // Thoát khỏi SDL_ttf
     std::cout << "SDL_ttf cleaned." << std::endl;
 
-    SDL_Quit();
+    // IMG_Quit();    // Gọi hàm này nếu bạn đã gọi IMG_Init() ở đầu init()
+    // std::cout << "SDL_image cleaned." << std::endl;
+
+    SDL_Quit();       // Thoát khỏi SDL core
+    std::cout << "SDL core cleaned." << std::endl;
+    std::cout << "Cleanup finished." << std::endl;
 }

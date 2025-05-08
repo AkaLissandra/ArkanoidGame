@@ -1,5 +1,6 @@
 #include "Ball.h"
 #include <iostream>
+#include <cmath>
 
 Ball::Ball() {
     m_x = 0.0f;
@@ -10,9 +11,10 @@ Ball::Ball() {
     m_velY = 0.0f;
 
     m_isOutOfBounds = false;
+    m_sfxHitSound = nullptr;
 }
 
-void Ball::init(const std::string& textureID, int x, int y, int width, int height, float velX, float velY) {
+void Ball::init(const std::string& textureID, int x, int y, int width, int height, float velX, float velY, Mix_Chunk* hitSoundEffect) {
     m_textureID = textureID;
     m_x = static_cast<float>(x);
     m_y = static_cast<float>(y);
@@ -20,6 +22,7 @@ void Ball::init(const std::string& textureID, int x, int y, int width, int heigh
     m_destRect.h = height;
     m_velX = velX;
     m_velY = velY;
+    m_sfxHitSound = hitSoundEffect;
 
     m_destRect.x = static_cast<int>(m_x);
     m_destRect.y = static_cast<int>(m_y);
@@ -42,17 +45,20 @@ void Ball::update() {
         m_y = 0;
         m_velY = -m_velY;
         m_destRect.y = static_cast<int>(m_y);
+        if (m_sfxHitSound != nullptr) Mix_PlayChannel(-1, m_sfxHitSound, 0);
     }
 
     if (m_destRect.x < 0) {
         m_x = 0;
         m_velX = -m_velX;
         m_destRect.x = static_cast<int>(m_x);
+        if (m_sfxHitSound != nullptr) Mix_PlayChannel(-1, m_sfxHitSound, 0);
     }
     if (m_destRect.x + m_destRect.w > SCREEN_WIDTH) {
         m_x = static_cast<float>(SCREEN_WIDTH - m_destRect.w);
         m_velX = -m_velX;
         m_destRect.x = static_cast<int>(m_x);
+        if (m_sfxHitSound != nullptr) Mix_PlayChannel(-1, m_sfxHitSound, 0);
     }
 
     if (m_destRect.y > SCREEN_HEIGHT) {

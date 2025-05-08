@@ -2,6 +2,7 @@
 #define BALL_H
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
 #include <string>
 #include "TextureManager.h"
 #include "Constants.h"
@@ -10,7 +11,7 @@ class Ball {
 public:
     Ball();
 
-    void init(const std::string& textureID, int x, int y, int width, int height, float velX, float velY);
+    void init(const std::string& textureID, int x, int y, int width, int height, float velX, float velY, Mix_Chunk* hitSoundEffect);
 
     void update();
     void render(SDL_Renderer* renderer, TextureManager& texManager);
@@ -39,6 +40,8 @@ private:
     float m_velX;
     float m_velY;
     bool m_isOutOfBounds;
+
+    Mix_Chunk* m_sfxHitSound;
 };
 
 #endif

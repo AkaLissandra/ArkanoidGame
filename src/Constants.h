@@ -25,17 +25,24 @@ const int FONT_SIZE_SCORE = 48;      // Kích thước lớn cho chữ Score
 const int FONT_SIZE_MENU_ITEM = 32;  // Kích thước trung bình cho các mục Menu
 const int FONT_SIZE_UI_TEXT = 24;    // Kích thước nhỏ hơn cho Best Score, Game Over text
 
-const int HEART_ICON_WIDTH = 25;     // Chiều rộng icon trái tim
-const int HEART_ICON_HEIGHT = 25;    // Chiều cao icon trái tim
+const int HEART_ICON_WIDTH = 25;
+const int HEART_ICON_HEIGHT = 25;
 const int UI_TOP_MARGIN = 10;        // Khoảng cách từ mép trên màn hình tới các UI element
 const int UI_SIDE_MARGIN = 15;       // Khoảng cách từ mép trái/phải màn hình
-const int HEART_SPACING = 5;         // Khoảng cách giữa các icon trái tim
+const int HEART_SPACING = 5;
+const int SOUND_ICON_WIDTH = 25;  // Kích thước icon âm thanh, bằng với Pause cho đẹp
+const int SOUND_ICON_HEIGHT = 25;
 
-// Trong Constants.h
-// ... (các hằng số UI_FONT_SIZE, HEART_ICON_WIDTH/HEIGHT, UI_TOP_MARGIN, UI_SIDE_MARGIN, HEART_SPACING như trước) ...
-const int PAUSE_ICON_WIDTH = 25;  // Hoặc kích thước thực tế của icon bạn
-const int PAUSE_ICON_HEIGHT = 25; // Hoặc kích thước thực tế của icon bạn
-const int ICON_SPACING = 10;      // Khoảng cách giữa icon Pause và icon Sound sau này
+const int PAUSE_ICON_WIDTH = 25;
+const int PAUSE_ICON_HEIGHT = 25;
+const int ICON_SPACING = 10;
 
 const int UI_BOTTOM_MARGIN = 10;
+
+const int POWERUP_SIZE = 20;
+const float POWERUP_FALL_SPEED = 2.0f;
+const int MAX_LIVES = 3;
+const int POWERUP_SPAWN_CHANCE_NORMAL = 10;
+
+const int BONUS_POINTS_VALUE = 50;
 #endif
