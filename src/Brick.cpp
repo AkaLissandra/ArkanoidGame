@@ -1,12 +1,13 @@
 #include "Brick.h"
 
-Brick::Brick(int x, int y, int width, int height, std::string textureID) {
+Brick::Brick(int x, int y, int width, int height, std::string textureID, int scoreValue) {
     m_rect.x = x;
     m_rect.y = y;
     m_rect.w = width;
     m_rect.h = height;
     m_textureID = textureID;
     m_isAlive = true;
+    m_scoreValue = scoreValue;
 }
 
 void Brick::render(SDL_Renderer* renderer, TextureManager& texManager) {
@@ -25,4 +26,8 @@ void Brick::hit() {
 
 SDL_Rect Brick::getRect() const {
     return m_rect;
+}
+
+int Brick::getScoreValue() const {
+    return m_scoreValue;
 }

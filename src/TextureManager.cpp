@@ -10,7 +10,6 @@ bool TextureManager::load(SDL_Renderer* renderer, const std::string& fileName, c
     }
 
     textureMap[id] = pTexture;
-    std::cout << "Loaded texture '" << fileName << "' with ID: " << id << std::endl;
     return true;
 }
 
@@ -32,14 +31,12 @@ void TextureManager::clearFromTextureMap(const std::string& id) {
     if (textureMap.count(id)) {
         SDL_DestroyTexture(textureMap[id]);
         textureMap.erase(id);
-        std::cout << "Cleared texture with ID: " << id << std::endl;
     } else {
-         std::cerr << "Could not clear texture with ID '" << id << "'. ID not found." << std::endl;
+        std::cerr << "Could not clear texture with ID '" << id << "'. ID not found." << std::endl;
     }
 }
 
 void TextureManager::clearAllTextures() {
-    std::cout << "Clearing all textures..." << std::endl;
     for (auto const& [id, texture] : textureMap) {
         SDL_DestroyTexture(texture);
     }

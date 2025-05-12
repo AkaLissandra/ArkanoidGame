@@ -6,6 +6,7 @@
 #include <SDL2/SDL_mixer.h>
 #include <vector>
 #include <string>
+#include <vector>
 #include "TextureManager.h"
 #include "Paddle.h"
 #include "Ball.h"
@@ -22,17 +23,16 @@ enum class GameStateEnum {
 enum class PowerUpType {
     NONE,
     EXTRA_LIFE,
-    BONUS_POINTS
-    // Sau này có thể thêm: PADDLE_WIDE, BALL_SPEED_UP, MULTI_BALL v.v...
+    BONUS_POINTS,
+    MAGIC_HAT_DESTROY_ROW
 };
 
 struct PowerUpItem {
-    SDL_Rect rect;        // Vị trí và kích thước
+    SDL_Rect rect;
     PowerUpType type;
-    bool isActive;        // Còn hoạt động (đang rơi / có thể nhặt) không?
+    bool isActive;
     std::string textureID;
-    float y_floatPos;     // Vị trí Y dạng float để rơi mượt hơn
-    // float fallSpeed; // Đã có trong Constants.h, không cần lưu ở đây nữa
+    float y_floatPos;
 };
 
 class Game {
@@ -64,7 +64,28 @@ private:
     void createBrickLayout();
     bool areAllBricksCleared() const;
     std::vector<PowerUpItem> m_powerUps;
+
+    bool initializeSubsystems();
+    bool loadMedia();
+    bool loadFonts();
+    void initGameObjects();
+    void setupInitialUI();
+
+    void handleMenuEvents(SDL_Event& event);
+    void handlePlayEvents(SDL_Event& event);
+    void handlePauseEvents(SDL_Event& event);
+    void handleGameOverEvents(SDL_Event& event);
+
+    void updateMenuState();
+    void updatePlayState();
+    void updatePauseState();
+    void updateGameOverState();
     
+    void renderMenuScreen();
+    void renderPlayScreen();
+    void renderPauseScreen();
+    void renderGameOverScreen();
+
     int m_lives;
     
     int m_score;
@@ -105,14 +126,20 @@ private:
 
     void resetGameForPlay();
 
-    Mix_Music* m_musicPlay;         // Cho nhạc nền (MP3)
-    Mix_Chunk* m_sfxBallHit;        // Cho tiếng bóng chạm (WAV)
-    Mix_Chunk* m_sfxLoseLife;       // Cho tiếng mất mạng (WAV)
-    Mix_Chunk* m_sfxButtonClick;    // Cho tiếng click nút (WAV)
+    Mix_Music* m_musicPlay;
+    Mix_Chunk* m_sfxBallHit;
+    Mix_Chunk* m_sfxLoseLife;
+    Mix_Chunk* m_sfxButtonClick;
     Mix_Chunk* m_sfxReward;
 
     bool m_isSoundMuted;
     SDL_Rect m_soundIconRect;
+
+    bool m_isMagicFlashActive;
+    float m_magicFlashTimer;
+    const float MAGIC_FLASH_DURATION = 0.25f;
+
+    float m_menuBgScrollY;
 };
 
 #endif
