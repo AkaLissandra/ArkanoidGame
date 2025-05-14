@@ -9,6 +9,12 @@
                 "-g", // Thêm thông tin để debug
                 "${workspaceFolder}/src/main.cpp", // File mã nguồn đầu vào (giả sử là main.cpp trong thư mục src)
                 "${workspaceFolder}/src/Game.cpp",
+                "${workspaceFolder}/src/Game_GameOverLogic.cpp",
+                "${workspaceFolder}/src/Game_Initialization.cpp",
+                "${workspaceFolder}/src/Game_MenuLogic.cpp",
+                "${workspaceFolder}/src/Game_PauseLogic.cpp",
+                "${workspaceFolder}/src/Game_PlayLogic.cpp",
+                "${workspaceFolder}/src/Game_Utilities.cpp",
                 "${workspaceFolder}/src/TextureManager.cpp",
                 "${workspaceFolder}/src/Paddle.cpp",
                 "${workspaceFolder}/src/Ball.cpp",

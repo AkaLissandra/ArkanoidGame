@@ -6,7 +6,6 @@
 #include <SDL2/SDL_mixer.h>
 #include <vector>
 #include <string>
-#include <vector>
 #include "TextureManager.h"
 #include "Paddle.h"
 #include "Ball.h"
